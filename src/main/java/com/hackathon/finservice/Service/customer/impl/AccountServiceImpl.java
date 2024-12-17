@@ -44,7 +44,8 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
-    public void createNewAccount(User user, AccountType accountType, String accountNumber) {
+    @Transactional
+    public void createNewAccount(User user, String accountType, String accountNumber) {
         Account mainAccount = accountRepository.findByAccountIdAndUser(accountNumber, user)
                 .orElseThrow(() -> new ApiException("Main account not found or does not belong to the user", HttpStatus.BAD_REQUEST));
 
@@ -56,7 +57,7 @@ public class AccountServiceImpl implements AccountService {
         Account newAccount = Account.builder()
                 .accountId(accountId)
                 .balance(BigDecimal.ZERO)
-                .accountType(accountType)
+                .accountType(AccountType.valueOf(accountType))
                 .user(user)
                 .build();
 

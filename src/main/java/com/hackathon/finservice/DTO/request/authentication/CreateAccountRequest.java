@@ -1,5 +1,6 @@
 package com.hackathon.finservice.DTO.request.authentication;
 
-import com.hackathon.finservice.Entities.AccountType;
+import jakarta.validation.constraints.NotBlank;
 
-public record CreateAccountRequest(String accountNumber, AccountType accountType) {}
+public record CreateAccountRequest(@NotBlank String accountNumber,
+                                   @NotBlank String accountType) {}

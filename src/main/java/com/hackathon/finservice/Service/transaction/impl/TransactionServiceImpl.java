@@ -1,6 +1,8 @@
 package com.hackathon.finservice.Service.transaction.impl;
 
 import com.hackathon.finservice.DTO.request.transaction.TransactionRequest;
+import com.hackathon.finservice.DTO.request.transaction.TransferRequest;
+import com.hackathon.finservice.DTO.response.transaction.TransactionDetail;
 import com.hackathon.finservice.Entities.Account;
 import com.hackathon.finservice.Entities.Transaction;
 import com.hackathon.finservice.Entities.TransactionStatus;
@@ -14,9 +16,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +32,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final TransactionRepository transactionRepository;
 
     @Override
+    @Transactional
     public void depositMoney(TransactionRequest transactionRequest) {
         Account account = getAccount();
 
@@ -42,19 +47,112 @@ public class TransactionServiceImpl implements TransactionService {
         account.setBalance(account.getBalance().add(finalAmount));
         accountRepository.save(account);
 
-        Transaction transaction = Transaction.builder()
-                .sourceAccount(account)
-                .transactionDate(Instant.now())
-                .amount(depositAmount)
-                .transactionType(TransactionType.CASH_DEPOSIT)
-                .transactionStatus(TransactionStatus.PENDING)
-                .build();
+        saveTransaction(depositAmount, account, null, TransactionType.CASH_DEPOSIT, TransactionStatus.PENDING);
+    }
 
-        transactionRepository.save(transaction);
+    @Override
+    @Transactional
+    public void withdrawMoney(TransactionRequest transactionRequest) {
+        Account account = getAccount();
+        BigDecimal withdrawAmount = transactionRequest.amount();
 
+        BigDecimal commission = BigDecimal.ZERO;
+        if (withdrawAmount.compareTo(BigDecimal.valueOf(10000)) > 0) {
+            commission = withdrawAmount.multiply(BigDecimal.valueOf(0.01));
+        }
+        BigDecimal totalDeduction = withdrawAmount.add(commission);
+
+        subtractMoney(totalDeduction, account);
+
+        saveTransaction(withdrawAmount, account, null, TransactionType.CASH_WITHDRAWAL, TransactionStatus.PENDING);
+    }
+
+    @Override
+    @Transactional
+    public void transferMoney(TransferRequest transferRequest) {
+        Account sourceAccount = getAccount();
+
+        Account destinationAccount = accountRepository.findByAccountId(transferRequest.targetAccountNumber())
+                .orElseThrow(ApiException::accessDenied);
+
+        if (sourceAccount.getAccountId().equals(destinationAccount.getAccountId())) {
+            throw new ApiException("Cannot transfer to the same account", HttpStatus.BAD_REQUEST);
+        }
+
+        BigDecimal transferAmount = transferRequest.amount();
+
+        boolean isFraud = transferAmount.compareTo(BigDecimal.valueOf(80000)) > 0;
+
+        TransactionStatus status = isFraud ? TransactionStatus.FRAUD : TransactionStatus.PENDING;
+        saveTransaction(transferAmount, sourceAccount, destinationAccount, TransactionType.CASH_TRANSFER, status);
+
+        if (checkFrequentTransfers(sourceAccount, destinationAccount)) {
+            status = TransactionStatus.FRAUD;
+            log.warn("Potential fraud detected: Multiple transfers to the same account within 5 seconds.");
+        }
+
+        if (status == TransactionStatus.FRAUD) {
+            throw new ApiException("Transaction marked as fraud", HttpStatus.BAD_REQUEST);
+        }
+
+        subtractMoney(transferAmount, sourceAccount);
+        addMoney(destinationAccount, transferAmount);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TransactionDetail> getTransactions() {
+        Account account = accountService.getUserAccount();
+
+        return transactionRepository.findBySourceAccount(account).stream()
+                .map(Transaction::toDetail)
+                .toList();
     }
 
     private Account getAccount() {
         return accountService.getUserAccount();
     }
+
+    private void subtractMoney(BigDecimal value, Account account) {
+        BigDecimal newBalance = account.getBalance().subtract(value);
+        boolean isNegativeBalance = newBalance.compareTo(BigDecimal.ZERO) < 0;
+
+        if (isNegativeBalance) {
+            log.warn("Insufficient balance to perform the subtraction, balance {}, subtract intent {}",
+                    account.getBalance(), value);
+            throw new ApiException("Insufficient balance", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        account.setBalance(newBalance);
+        accountRepository.save(account);
+    }
+
+    private void saveTransaction(BigDecimal amount, Account sourceAccount, Account targetAccount,
+                                 TransactionType transactionType, TransactionStatus transactionStatus) {
+
+        Transaction transaction = Transaction.builder()
+                .sourceAccount(sourceAccount)
+                .targetAccount(targetAccount)
+                .amount(amount)
+                .transactionType(transactionType)
+                .transactionStatus(transactionStatus)
+                .transactionDate(Instant.now())
+                .build();
+
+        transactionRepository.save(transaction);
+    }
+
+    private void addMoney(Account account, BigDecimal amount) {
+        account.setBalance(account.getBalance().add(amount));
+        accountRepository.save(account);
+    }
+
+    private boolean checkFrequentTransfers(Account sourceAccount, Account targetAccount) {
+        Instant fiveSecondsAgo = Instant.now().minusSeconds(5);
+
+        long transferCount = transactionRepository.countBySourceAccountAndTargetAccountAndTransactionDateAfter(
+                sourceAccount, targetAccount, fiveSecondsAgo);
+
+        return transferCount >= 4;
+    }
+
 }
