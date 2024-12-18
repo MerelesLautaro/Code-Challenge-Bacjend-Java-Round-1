@@ -61,9 +61,7 @@ public class TransactionServiceImpl implements TransactionService {
 
         subtractMoney(totalDeduction, account);
 
-        Transaction transaction = saveTransaction(withdrawAmount, account, null, TransactionType.CASH_WITHDRAWAL, TransactionStatus.PENDING);
-        transaction.setTransactionStatus(TransactionStatus.APPROVED);
-        transactionRepository.save(transaction);
+        saveTransaction(withdrawAmount, account, null, TransactionType.CASH_WITHDRAWAL, TransactionStatus.PENDING);
     }
 
     @Override
@@ -129,7 +127,7 @@ public class TransactionServiceImpl implements TransactionService {
         accountRepository.save(account);
     }
 
-    private Transaction saveTransaction(BigDecimal amount, Account sourceAccount, Account targetAccount,
+    private void saveTransaction(BigDecimal amount, Account sourceAccount, Account targetAccount,
                                  TransactionType transactionType, TransactionStatus transactionStatus) {
 
         Transaction transaction = Transaction.builder()
@@ -141,7 +139,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .transactionDate(Instant.now())
                 .build();
 
-        return transactionRepository.save(transaction);
+        transactionRepository.save(transaction);
     }
 
     private void addMoney(Account account, BigDecimal amount) {
