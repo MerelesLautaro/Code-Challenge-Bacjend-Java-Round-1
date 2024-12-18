@@ -3,10 +3,7 @@ package com.hackathon.finservice.Service.transaction.impl;
 import com.hackathon.finservice.DTO.request.transaction.TransactionRequest;
 import com.hackathon.finservice.DTO.request.transaction.TransferRequest;
 import com.hackathon.finservice.DTO.response.transaction.TransactionDetail;
-import com.hackathon.finservice.Entities.Account;
-import com.hackathon.finservice.Entities.Transaction;
-import com.hackathon.finservice.Entities.TransactionStatus;
-import com.hackathon.finservice.Entities.TransactionType;
+import com.hackathon.finservice.Entities.*;
 import com.hackathon.finservice.Exception.ApiException;
 import com.hackathon.finservice.Repositories.AccountRepository;
 import com.hackathon.finservice.Repositories.TransactionRepository;
@@ -74,6 +71,10 @@ public class TransactionServiceImpl implements TransactionService {
 
         Account destinationAccount = accountRepository.findByAccountId(transferRequest.targetAccountNumber())
                 .orElseThrow(ApiException::accessDenied);
+
+        if (destinationAccount.getAccountType() == AccountType.Invest && sourceAccount.getAccountType() != AccountType.Main) {
+            throw new ApiException("Only main accounts can transfer to investment accounts", HttpStatus.FORBIDDEN);
+        }
 
         if (sourceAccount.getAccountId().equals(destinationAccount.getAccountId())) {
             throw new ApiException("Cannot transfer to the same account", HttpStatus.BAD_REQUEST);
