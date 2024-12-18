@@ -53,6 +53,13 @@ public class AccountServiceImpl implements AccountService {
             throw new ApiException("The referenced account is not of type Main", HttpStatus.BAD_REQUEST);
         }
 
+        if (AccountType.valueOf(accountType).equals(AccountType.Invest)) {
+            boolean hasInvestAccount = accountRepository.existsByUserAndAccountType(user, AccountType.Invest);
+            if (hasInvestAccount) {
+                throw new ApiException("The user already has an Invest account", HttpStatus.BAD_REQUEST);
+            }
+        }
+
         String accountId = UUID.randomUUID().toString();
         Account newAccount = Account.builder()
                 .accountId(accountId)
