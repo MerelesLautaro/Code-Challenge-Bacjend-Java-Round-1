@@ -7,6 +7,7 @@ import com.hackathon.finservice.Entities.User;
 import com.hackathon.finservice.Exception.ApiException;
 import com.hackathon.finservice.Repositories.AccountRepository;
 import com.hackathon.finservice.Service.customer.AccountService;
+import com.hackathon.finservice.Service.transaction.impl.InterestServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -25,6 +26,7 @@ public class AccountServiceImpl implements AccountService {
 
     private final AccountRepository accountRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final InterestServiceImpl interestService;
 
     @Override
     @Transactional
@@ -69,6 +71,8 @@ public class AccountServiceImpl implements AccountService {
                 .build();
 
         accountRepository.save(newAccount);
+        interestService.startInterestTask(user);
+
     }
 
     @Override

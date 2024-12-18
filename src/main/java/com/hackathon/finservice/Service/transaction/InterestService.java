@@ -1,5 +1,7 @@
 package com.hackathon.finservice.Service.transaction;
 
+import com.hackathon.finservice.Entities.User;
+
 public interface InterestService {
-    void applyInvestmentInterest();
+    void applyInvestmentInterest(User user);
 }
