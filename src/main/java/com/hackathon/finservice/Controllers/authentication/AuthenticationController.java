@@ -7,6 +7,7 @@ import com.hackathon.finservice.Entities.Token;
 import com.hackathon.finservice.Service.authentication.AuthenticationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.BadRequestException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +21,7 @@ public class AuthenticationController {
 
     @PostMapping("/register")
     public ResponseEntity<UserDetailsResponse> registerUser(@RequestBody @Valid
-                                                            UserRegisterRequest userRegisterRequest) {
+                                                            UserRegisterRequest userRegisterRequest) throws BadRequestException {
 
         return ResponseEntity.ok(authenticationService.registerUser(userRegisterRequest));
     }
