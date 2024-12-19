@@ -40,7 +40,7 @@ public class InterestServiceImpl implements InterestService {
                 this.applyInvestmentInterest(user);
             } catch (RuntimeException e) {
                 log.warn("Stopping interest task due to an error", e);
-                cancelInterestTask(user.getId());
+                cancelInterestTask(user);
             }
         };
 
@@ -62,9 +62,11 @@ public class InterestServiceImpl implements InterestService {
         scheduledTasks.put(userId, futureTask);
     }
 
-    public void cancelInterestTask(Long userId) {
-        if (scheduledTasks.get(userId) != null) {
-            scheduledTasks.get(userId).cancel(true);
+    public void cancelInterestTask(User user) {
+        Long userId = user.getId();
+        ScheduledFuture<?> existingTask = scheduledTasks.get(userId);
+        if (existingTask != null) {
+            existingTask.cancel(true);
             scheduledTasks.remove(userId);
         }
     }
