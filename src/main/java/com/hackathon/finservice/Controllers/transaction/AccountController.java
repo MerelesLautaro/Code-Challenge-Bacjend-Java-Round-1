@@ -7,6 +7,7 @@ import com.hackathon.finservice.DTO.request.transaction.TransferRequest;
 import com.hackathon.finservice.DTO.response.transaction.TransactionDetail;
 import com.hackathon.finservice.Entities.User;
 import com.hackathon.finservice.Service.customer.AccountService;
+import com.hackathon.finservice.Service.transaction.InterestService;
 import com.hackathon.finservice.Service.transaction.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class AccountController {
 
     private final AccountService accountService;
     private final TransactionService transactionService;
+    private final InterestService interestService;
 
     @PostMapping("/create")
     public ResponseEntity<String> createNewAccount(@Valid @RequestBody CreateAccountRequest request) {
@@ -34,6 +36,7 @@ public class AccountController {
         User user = (User) authentication.getPrincipal();
 
         accountService.createNewAccount(user, request.accountType() , request.accountNumber());
+        interestService.startInterestTask(user);
 
         return ResponseEntity.ok("New account added successfully for user");
     }

@@ -33,7 +33,7 @@ public class InterestServiceImpl implements InterestService {
         this.scheduledTasks = new HashMap<>();
     }
 
-
+    @Override
     public void startInterestTask(User user) {
         Runnable task = () -> {
             try {
