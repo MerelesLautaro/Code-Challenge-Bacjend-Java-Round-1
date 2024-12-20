@@ -36,7 +36,6 @@ public class AccountController {
         User user = (User) authentication.getPrincipal();
 
         accountService.createNewAccount(user, request.accountType() , request.accountNumber());
-        interestService.startInterestTask(user);
 
         return ResponseEntity.ok("New account added successfully for user");
     }
@@ -61,6 +60,9 @@ public class AccountController {
 
     @GetMapping("/transactions")
     public ResponseEntity<List<TransactionDetail>> getTransactions(){
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User user = (User) authentication.getPrincipal();
+        interestService.startInterestTask(user);
         return ResponseEntity.ok(transactionService.getTransactions());
     }
 
