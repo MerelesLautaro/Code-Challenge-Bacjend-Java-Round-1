@@ -16,6 +16,7 @@ import com.hackathon.finservice.Service.customer.AccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -60,15 +61,21 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public Token login(LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.identifier(), loginRequest.password()));
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginRequest.identifier(), loginRequest.password()));
 
-        User userDetails = (User) authentication.getPrincipal();
+            User userDetails = (User) authentication.getPrincipal();
 
-        String token = tokenService.generateToken(userDetails);
+            String token = tokenService.generateToken(userDetails);
 
-        return new Token(token);
+            return new Token(token);
+
+        } catch (BadCredentialsException e) {
+            throw new ApiException("Bad credentials", HttpStatus.UNAUTHORIZED);
+        }
     }
+
 
     @Override
     public void logout(String token) {
