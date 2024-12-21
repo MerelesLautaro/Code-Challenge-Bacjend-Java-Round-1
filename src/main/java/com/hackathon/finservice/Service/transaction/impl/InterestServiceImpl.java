@@ -8,7 +8,6 @@ import com.hackathon.finservice.Service.transaction.InterestService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -40,24 +39,24 @@ public class InterestServiceImpl implements InterestService {
         if (accountInterest.isPresent()) {
             Account investAccount = accountInterest.get();
 
-            // Solo iniciamos la tarea si el saldo es mayor a 0
+            log.info("Interest task started for investment account {} (Account number: {}). Interest will be applied every 10 seconds.",
+                    investAccount.getAccountId(), investAccount.getAccountId());
+
             if (investAccount.getBalance().compareTo(BigDecimal.ZERO) > 0) {
                 Runnable task = () -> {
                     try {
                         this.applyInvestmentInterest(user);
                     } catch (RuntimeException e) {
-                        log.warn("Stopping interest task due to an error", e);
+                        log.warn("Stopping interest task due to an error for user {}: {}", user.getUsername(), e.getMessage());
                         cancelInterestTask(user);
                     }
                 };
-
-                log.info("Interest task started, waiting for first 10-second cycle...");
                 scheduleInterestTask(user, task, 10);
             } else {
-                log.info("Account balance is 0, not starting interest task for user: {}", user.getUsername());
+                log.info("Account balance is 0 for user {}. Interest task not started.", user.getUsername());
             }
         } else {
-            log.warn("No investment account found for user: {}", user.getUsername());
+            log.warn("No investment account found for user {}. Interest task not started.", user.getUsername());
         }
     }
 
@@ -76,28 +75,11 @@ public class InterestServiceImpl implements InterestService {
         scheduledTasks.put(userId, futureTask);
     }
 
-    public void cancelInterestTask(User user) {
-        Long userId = user.getId();
-        ScheduledFuture<?> existingTask = scheduledTasks.get(userId);
-        if (existingTask != null) {
-            existingTask.cancel(true);
-            scheduledTasks.remove(userId);
-        }
-    }
-
-    private boolean firstExecution = true;
-
     public void applyInvestmentInterest(User user) {
         Optional<Account> accountInterest = accountRepository.findByUserAndAccountType(user, AccountType.Invest);
 
         if (accountInterest.isPresent()) {
             Account investAccount = accountInterest.get();
-
-            if (firstExecution) {
-                log.info("Waiting 10 seconds before applying interest for the first time.");
-                firstExecution = false;
-                return;
-            }
 
             if (investAccount.getBalance().compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal currentBalance = investAccount.getBalance();
@@ -107,10 +89,22 @@ public class InterestServiceImpl implements InterestService {
                 investAccount.setBalance(newBalance);
                 accountRepository.save(investAccount);
 
-                log.info("Applied 10% interest to account: {}. New balance: {}", investAccount.getAccountId(), newBalance);
+                log.info("Applied 10% interest to investment account {} (Account number: {}). " +
+                                "Old balance: {}, Interest applied: {}, New balance: {}",
+                        investAccount.getAccountId(), investAccount.getAccountId(),
+                        currentBalance, interest, newBalance);
             }
         } else {
-            log.warn("No investment account found for user: {}", user.getUsername());
+            log.warn("No investment account found for user {}. No interest applied.", user.getUsername());
+        }
+    }
+
+    public void cancelInterestTask(User user) {
+        Long userId = user.getId();
+        ScheduledFuture<?> existingTask = scheduledTasks.get(userId);
+        if (existingTask != null) {
+            existingTask.cancel(true);
+            scheduledTasks.remove(userId);
         }
     }
 }
