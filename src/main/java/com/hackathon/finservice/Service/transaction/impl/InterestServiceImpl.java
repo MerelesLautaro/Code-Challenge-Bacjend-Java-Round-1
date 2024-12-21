@@ -35,16 +35,27 @@ public class InterestServiceImpl implements InterestService {
 
     @Override
     public void startInterestTask(User user) {
-        Runnable task = () -> {
-            try {
-                this.applyInvestmentInterest(user);
-            } catch (RuntimeException e) {
-                log.warn("Stopping interest task due to an error", e);
-                cancelInterestTask(user);
-            }
-        };
+        Optional<Account> accountInterest = accountRepository.findByUserAndAccountType(user, AccountType.Invest);
 
-        scheduleInterestTask(user, task, 10);
+        if (accountInterest.isPresent()) {
+            Account investAccount = accountInterest.get();
+
+            if (investAccount.getBalance().compareTo(BigDecimal.ZERO) > 0) {
+                Runnable task = () -> {
+                    try {
+                        this.applyInvestmentInterest(user);
+                    } catch (RuntimeException e) {
+                        log.warn("Stopping interest task due to an error", e);
+                        cancelInterestTask(user);
+                    }
+                };
+                scheduleInterestTask(user, task, 10);
+            } else {
+                log.info("Account balance is 0, not starting interest task for user: {}", user.getUsername());
+            }
+        } else {
+            log.warn("No investment account found for user: {}", user.getUsername());
+        }
     }
 
     public void scheduleInterestTask(User user, Runnable task, long delayInSeconds) {
@@ -71,7 +82,6 @@ public class InterestServiceImpl implements InterestService {
         }
     }
 
-    @Transactional
     public void applyInvestmentInterest(User user) {
         Optional<Account> accountInterest = accountRepository.findByUserAndAccountType(user, AccountType.Invest);
 

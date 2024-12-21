@@ -5,7 +5,9 @@ import com.hackathon.finservice.DTO.request.authentication.CreateAccountRequest;
 import com.hackathon.finservice.DTO.request.transaction.TransactionRequest;
 import com.hackathon.finservice.DTO.request.transaction.TransferRequest;
 import com.hackathon.finservice.DTO.response.transaction.TransactionDetail;
+import com.hackathon.finservice.Entities.Account;
 import com.hackathon.finservice.Entities.User;
+import com.hackathon.finservice.Repositories.AccountRepository;
 import com.hackathon.finservice.Service.customer.AccountService;
 import com.hackathon.finservice.Service.transaction.InterestService;
 import com.hackathon.finservice.Service.transaction.TransactionService;
@@ -19,7 +21,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/account")
@@ -27,6 +31,7 @@ import java.util.List;
 public class AccountController {
 
     private final AccountService accountService;
+    private final AccountRepository accountRepository;
     private final TransactionService transactionService;
     private final InterestService interestService;
 
@@ -34,7 +39,6 @@ public class AccountController {
     public ResponseEntity<String> createNewAccount(@Valid @RequestBody CreateAccountRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         User user = (User) authentication.getPrincipal();
-
         accountService.createNewAccount(user, request.accountType() , request.accountNumber());
 
         return ResponseEntity.ok("New account added successfully for user");
@@ -54,10 +58,11 @@ public class AccountController {
 
     @PostMapping("/fund-transfer")
     public ResponseEntity<ReducedGenericResponse> transfer(@Valid @RequestBody TransferRequest transferRequest) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User user = (User) authentication.getPrincipal();
-        interestService.startInterestTask(user);
         transactionService.transferMoney(transferRequest);
+        Optional<Account> accountInterest = accountRepository.findByAccountId(transferRequest.targetAccountNumber());
+        if (accountInterest.isPresent() && accountInterest.get().getBalance().compareTo(BigDecimal.ZERO) > 0) {
+            interestService.startInterestTask(accountInterest.get().getUser());
+        }
         return ResponseEntity.ok(getGenericResponse("Fund transferred successfully"));
     }
 
