@@ -39,12 +39,31 @@ public class TransactionServiceImpl implements TransactionService {
         if (depositAmount.compareTo(BigDecimal.valueOf(50000)) > 0) {
             commission = depositAmount.multiply(BigDecimal.valueOf(0.02));
         }
+
         BigDecimal finalAmount = depositAmount.subtract(commission);
 
-        account.setBalance(account.getBalance().add(finalAmount));
-        accountRepository.save(account);
+        BigDecimal originalBalance = account.getBalance();
+        account.setBalance(originalBalance.add(finalAmount));
 
-        saveTransaction(depositAmount, account, null, TransactionType.CASH_DEPOSIT, TransactionStatus.PENDING);
+        accountRepository.save(account);
+        accountRepository.flush();
+
+        Transaction transaction = saveTransaction(depositAmount, account, null,
+                TransactionType.CASH_DEPOSIT,
+                TransactionStatus.PENDING);
+
+        Account updatedAccount = accountRepository.findById(account.getId())
+                .orElseThrow(() -> new RuntimeException("Account not found"));
+
+        BigDecimal expectedBalance = originalBalance.add(finalAmount);
+
+        if (updatedAccount.getBalance().compareTo(expectedBalance) == 0) {
+            transaction.setTransactionStatus(TransactionStatus.APPROVED);
+            transactionRepository.save(transaction);
+        } else {
+            log.error("Deposit failed: Balance mismatch.");
+            throw new RuntimeException("Error in depositing the funds. Please try again.");
+        }
     }
 
     @Override
@@ -127,7 +146,7 @@ public class TransactionServiceImpl implements TransactionService {
         accountRepository.save(account);
     }
 
-    private void saveTransaction(BigDecimal amount, Account sourceAccount, Account targetAccount,
+    private Transaction saveTransaction(BigDecimal amount, Account sourceAccount, Account targetAccount,
                                  TransactionType transactionType, TransactionStatus transactionStatus) {
 
         Transaction transaction = Transaction.builder()
@@ -139,7 +158,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .transactionDate(Instant.now())
                 .build();
 
-        transactionRepository.save(transaction);
+        return transactionRepository.save(transaction);
     }
 
     private void addMoney(Account account, BigDecimal amount) {

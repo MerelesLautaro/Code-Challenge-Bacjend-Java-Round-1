@@ -54,15 +54,15 @@ public class AccountController {
 
     @PostMapping("/fund-transfer")
     public ResponseEntity<ReducedGenericResponse> transfer(@Valid @RequestBody TransferRequest transferRequest) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User user = (User) authentication.getPrincipal();
+        interestService.startInterestTask(user);
         transactionService.transferMoney(transferRequest);
         return ResponseEntity.ok(getGenericResponse("Fund transferred successfully"));
     }
 
     @GetMapping("/transactions")
     public ResponseEntity<List<TransactionDetail>> getTransactions(){
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User user = (User) authentication.getPrincipal();
-        interestService.startInterestTask(user);
         return ResponseEntity.ok(transactionService.getTransactions());
     }
 
