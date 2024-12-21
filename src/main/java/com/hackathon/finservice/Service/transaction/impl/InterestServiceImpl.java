@@ -40,6 +40,7 @@ public class InterestServiceImpl implements InterestService {
         if (accountInterest.isPresent()) {
             Account investAccount = accountInterest.get();
 
+            // Solo iniciamos la tarea si el saldo es mayor a 0
             if (investAccount.getBalance().compareTo(BigDecimal.ZERO) > 0) {
                 Runnable task = () -> {
                     try {
@@ -49,6 +50,8 @@ public class InterestServiceImpl implements InterestService {
                         cancelInterestTask(user);
                     }
                 };
+
+                log.info("Interest task started, waiting for first 10-second cycle...");
                 scheduleInterestTask(user, task, 10);
             } else {
                 log.info("Account balance is 0, not starting interest task for user: {}", user.getUsername());
@@ -82,19 +85,26 @@ public class InterestServiceImpl implements InterestService {
         }
     }
 
+    private boolean firstExecution = true;
+
     public void applyInvestmentInterest(User user) {
         Optional<Account> accountInterest = accountRepository.findByUserAndAccountType(user, AccountType.Invest);
 
         if (accountInterest.isPresent()) {
             Account investAccount = accountInterest.get();
-            if (investAccount.getBalance().compareTo(BigDecimal.ZERO) > 0) {
 
+            if (firstExecution) {
+                log.info("Waiting 10 seconds before applying interest for the first time.");
+                firstExecution = false;
+                return;
+            }
+
+            if (investAccount.getBalance().compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal currentBalance = investAccount.getBalance();
                 BigDecimal interest = currentBalance.multiply(BigDecimal.valueOf(0.10));
                 BigDecimal newBalance = currentBalance.add(interest);
 
                 investAccount.setBalance(newBalance);
-
                 accountRepository.save(investAccount);
 
                 log.info("Applied 10% interest to account: {}. New balance: {}", investAccount.getAccountId(), newBalance);
